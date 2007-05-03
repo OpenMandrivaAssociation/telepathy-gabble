@@ -1,5 +1,5 @@
 Name:           telepathy-gabble
-Version:        0.5.4
+Version:        0.5.11
 Release:        %mkrel 1
 Summary:        A Jabber/XMPP connection manager
 
@@ -14,9 +14,10 @@ BuildRequires:	dbus-glib-devel
 BuildRequires:	loudmouth-devel
 BuildRequires:  libxslt-proc
 BuildRequires:  python-devel
-
+BuildRequires:  telepathy-glib
 Requires:	telepathy-filesystem
-
+# no longer exist since 0.5.11
+Obsoletes:  telepathy-gabble-devel
 
 %description
 A Jabber/XMPP connection manager, that handles single and multi-user
@@ -29,34 +30,13 @@ chats and voice calls.
 %{_datadir}/dbus-1/services/*.service
 %{_datadir}/telepathy/managers/*.manager
 
-#--------------------------------------------------------------------
-%package        devel
-Group:          System/Libraries
-Summary:        Libraries for %{name}
-
-Requires:       %name = %version
-Provides:       lib%name-devel
-
-%description    devel
-The libraries from %{name} package
-
-%files devel
-%defattr(-,root,root,-)
-%{_includedir}/telepathy-1.0/telepathy-glib/_gen/*.h
-%{_includedir}/telepathy-1.0/telepathy-glib/*.h
-%{_libdir}/pkgconfig/telepathy-glib.pc
-%{_libdir}/*.a
-%{_libdir}/*.la
-
-#--------------------------------------------------------------------
-
 %prep
 %setup -q
 
 
 %build
 %configure --disable-loudmouth-versioning
-make %{?_smp_mflags}
+%make 
 
 
 %install
