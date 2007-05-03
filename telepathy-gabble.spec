@@ -1,6 +1,6 @@
 Name:           telepathy-gabble
 Version:        0.5.11
-Release:        %mkrel 1
+Release:        %mkrel 2
 Summary:        A Jabber/XMPP connection manager
 
 Group:          Networking/Instant messaging
@@ -17,7 +17,7 @@ BuildRequires:  python-devel
 BuildRequires:  telepathy-glib
 Requires:	telepathy-filesystem
 # no longer exist since 0.5.11
-Obsoletes:  telepathy-gabble-devel
+Obsoletes:      telepathy-gabble-devel
 
 %description
 A Jabber/XMPP connection manager, that handles single and multi-user
@@ -30,6 +30,8 @@ chats and voice calls.
 %{_datadir}/dbus-1/services/*.service
 %{_datadir}/telepathy/managers/*.manager
 
+#--------------------------------------------------------------------
+
 %prep
 %setup -q
 
@@ -40,11 +42,9 @@ chats and voice calls.
 
 
 %install
-rm -rf $RPM_BUILD_ROOT
-make install DESTDIR=$RPM_BUILD_ROOT
+rm -rf %buildroot
+make install DESTDIR=%buildroot
 
 
 %clean
-rm -rf $RPM_BUILD_ROOT
-
-
+rm -rf %buildroot
