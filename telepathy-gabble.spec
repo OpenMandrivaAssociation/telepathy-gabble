@@ -7,6 +7,7 @@ Group:          Networking/Instant messaging
 License:        LGPL
 URL:            http://telepathy.freedesktop.org/wiki/
 Source0:        http://telepathy.freedesktop.org/releases/%{name}/%{name}-%{version}.tar.bz2
+BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}-root
 
 BuildRequires:  dbus-devel
 BuildRequires:	dbus-glib-devel
