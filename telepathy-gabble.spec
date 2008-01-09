@@ -1,5 +1,5 @@
 Name:           telepathy-gabble
-Version:        0.6.0
+Version:        0.7.1
 Release:        %mkrel 1
 Summary:        A Jabber/XMPP connection manager
 
@@ -27,9 +27,11 @@ chats and voice calls.
 %files
 %defattr(-,root,root,-)
 %doc COPYING AUTHORS
-%{_bindir}/%{name}
+#%{_bindir}/%{name}
 %{_datadir}/dbus-1/services/*.service
 %{_datadir}/telepathy/managers/*.manager
+%{_libdir}/telepathy-gabble
+%{_mandir}/man*/*.lzma
 
 #--------------------------------------------------------------------
 
