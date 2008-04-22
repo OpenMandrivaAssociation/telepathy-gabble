@@ -1,12 +1,12 @@
 Name:           telepathy-gabble
-Version:        0.7.2
+Version:        0.7.3
 Release:        %mkrel 1
 Summary:        A Jabber/XMPP connection manager
 
 Group:          Networking/Instant messaging
-License:        LGPL
+License:        LGPLv2+
 URL:            http://telepathy.freedesktop.org/wiki/
-Source0:        http://telepathy.freedesktop.org/releases/%{name}/%{name}-%{version}.tar.bz2
+Source0:        http://telepathy.freedesktop.org/releases/%{name}/%{name}-%{version}.tar.gz
 BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}-root
 
 BuildRequires:  dbus-devel
@@ -26,7 +26,7 @@ chats and voice calls.
 
 %files
 %defattr(-,root,root,-)
-%doc COPYING AUTHORS
+%doc NEWS README AUTHORS
 #%{_bindir}/%{name}
 %{_datadir}/dbus-1/services/*.service
 %{_datadir}/telepathy/managers/*.manager
