@@ -14,7 +14,7 @@ BuildRequires:	dbus-glib-devel
 BuildRequires:	loudmouth-devel
 BuildRequires:  libxslt-proc
 BuildRequires:  python-devel
-BuildRequires:  telepathy-glib
+BuildRequires:  libtelepathy-glib-devel
 Requires:	telepathy-filesystem
 Obsoletes:      tapioca-xmpp
 # no longer exist since 0.5.11
@@ -27,7 +27,6 @@ chats and voice calls.
 %files
 %defattr(-,root,root,-)
 %doc NEWS README AUTHORS
-#%{_bindir}/%{name}
 %{_datadir}/dbus-1/services/*.service
 %{_datadir}/telepathy/managers/*.manager
 %{_libdir}/telepathy-gabble
@@ -42,11 +41,9 @@ chats and voice calls.
 %configure2_5x --disable-loudmouth-versioning
 %make
 
-
 %install
 rm -rf %buildroot
-make install DESTDIR=%buildroot
-
+%makeinstall_std
 
 %clean
 rm -rf %buildroot
