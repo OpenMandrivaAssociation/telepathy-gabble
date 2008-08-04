@@ -1,5 +1,5 @@
 Name:           telepathy-gabble
-Version:        0.7.6
+Version:        0.7.7
 Release:        %mkrel 1
 Summary:        A Jabber/XMPP connection manager
 
@@ -7,6 +7,9 @@ Group:          Networking/Instant messaging
 License:        LGPLv2+
 URL:            http://telepathy.freedesktop.org/wiki/
 Source0:        http://telepathy.freedesktop.org/releases/%{name}/%{name}-%{version}.tar.gz
+# Upstream fix from darcs repository, fixes telepathy-gabble with
+# glib 2.17
+Patch0:		telepath-gabble-0.7.7-garray-fix.patch
 BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}-root
 
 BuildRequires:  dbus-devel
@@ -36,6 +39,7 @@ chats and voice calls.
 
 %prep
 %setup -q
+%patch0 -p1 -b .garray-fix
 
 %build
 %configure2_5x --disable-loudmouth-versioning
