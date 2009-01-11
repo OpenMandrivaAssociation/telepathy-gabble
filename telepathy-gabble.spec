@@ -1,6 +1,6 @@
 Name:           telepathy-gabble
 Version:        0.7.18
-Release:        %mkrel 1
+Release:        %mkrel 2
 Summary:        A Jabber/XMPP connection manager
 
 Group:          Networking/Instant messaging
@@ -40,7 +40,7 @@ chats and voice calls.
 %setup -q
 
 %build
-%configure2_5x --disable-loudmouth-versioning
+%configure2_5x --disable-loudmouth-versioning --enable-olpc
 %make
 
 %install
