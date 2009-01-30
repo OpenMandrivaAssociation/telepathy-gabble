@@ -1,6 +1,6 @@
 Name:           telepathy-gabble
-Version:        0.7.18
-Release:        %mkrel 2
+Version:        0.7.19
+Release:        %mkrel 1
 Summary:        A Jabber/XMPP connection manager
 
 Group:          Networking/Instant messaging
