@@ -17,6 +17,7 @@ BuildRequires:	loudmouth-devel
 BuildRequires:  libxslt-proc
 BuildRequires:  python-devel
 BuildRequires:  libtelepathy-glib-devel
+BuildRequires:	libsoup-devel
 Requires:	telepathy-filesystem
 Obsoletes:      tapioca-xmpp
 # no longer exist since 0.5.11
