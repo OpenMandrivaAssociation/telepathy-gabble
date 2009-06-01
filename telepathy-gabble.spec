@@ -1,5 +1,5 @@
 Name:           telepathy-gabble
-Version:        0.7.27
+Version:        0.7.28
 Release:        %mkrel 1
 Summary:        A Jabber/XMPP connection manager
 
@@ -16,7 +16,7 @@ BuildRequires:	dbus-glib-devel
 BuildRequires:	loudmouth-devel
 BuildRequires:  libxslt-proc
 BuildRequires:  python-devel
-BuildRequires:  libtelepathy-glib-devel
+BuildRequires:  libtelepathy-glib-devel >= 0.7.31
 BuildRequires:	libsoup-devel
 Requires:	telepathy-filesystem
 Obsoletes:      tapioca-xmpp
