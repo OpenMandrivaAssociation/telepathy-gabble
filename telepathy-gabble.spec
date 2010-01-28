@@ -1,5 +1,5 @@
 Name:           telepathy-gabble
-Version:        0.9.3
+Version:        0.9.4
 Release:        %mkrel 1
 Summary:        A Jabber/XMPP connection manager
 
@@ -7,13 +7,10 @@ Group:          Networking/Instant messaging
 License:        LGPLv2+
 URL:            http://telepathy.freedesktop.org/wiki/
 Source0:        http://telepathy.freedesktop.org/releases/%{name}/%{name}-%{version}.tar.gz
-# Upstream fix from darcs repository, fixes telepathy-gabble with
-# glib 2.17
 BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}-root
 
 BuildRequires:  dbus-devel
 BuildRequires:	dbus-glib-devel
-BuildRequires:	loudmouth-devel
 BuildRequires:  libxslt-proc
 BuildRequires:  python-devel
 BuildRequires:  libtelepathy-glib-devel >= 0.7.31
@@ -34,6 +31,9 @@ chats and voice calls.
 %{_datadir}/telepathy/managers/*.manager
 %{_libdir}/telepathy-gabble
 %{_mandir}/man*/*.lzma
+%{_libdir}/telepathy/gabble-0/gateways.la
+%{_libdir}/telepathy/gabble-0/gateways.so
+
 
 #--------------------------------------------------------------------
 
@@ -41,7 +41,7 @@ chats and voice calls.
 %setup -q
 
 %build
-%configure2_5x --disable-loudmouth-versioning --enable-olpc
+CFLAGS="%{optflags} -fPIC" %configure2_5x --enable-olpc --disable-static
 %make
 
 %install
