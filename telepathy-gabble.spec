@@ -15,7 +15,7 @@ BuildRequires:  libxslt-proc
 BuildRequires:  python-devel
 BuildRequires:  libtelepathy-glib-devel >= 0.7.31
 BuildRequires:	libsoup-devel
-BuildRequires:	libnice-devel >= 0.0.11
+BuildRequires:	nice-devel >= 0.0.11
 Requires:	telepathy-filesystem
 Obsoletes:      tapioca-xmpp
 # no longer exist since 0.5.11
