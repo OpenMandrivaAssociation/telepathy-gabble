@@ -1,6 +1,6 @@
 Name:           telepathy-gabble
-Version:        0.9.10
-Release:        %mkrel 2
+Version:        0.9.13
+Release:        %mkrel 1
 Summary:        A Jabber/XMPP connection manager
 
 Group:          Networking/Instant messaging
@@ -15,6 +15,7 @@ BuildRequires:  libxslt-proc
 BuildRequires:  python-devel
 BuildRequires:  libtelepathy-glib-devel >= 0.7.31
 BuildRequires:	libsoup-devel
+BuildRequires:	libnice-devel >= 0.0.11
 Requires:	telepathy-filesystem
 Obsoletes:      tapioca-xmpp
 # no longer exist since 0.5.11
