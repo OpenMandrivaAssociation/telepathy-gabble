@@ -1,5 +1,5 @@
 Name:           telepathy-gabble
-Version:        0.9.13
+Version:        0.9.15
 Release:        %mkrel 1
 Summary:        A Jabber/XMPP connection manager
 
@@ -16,6 +16,7 @@ BuildRequires:  python-devel
 BuildRequires:  libtelepathy-glib-devel >= 0.7.31
 BuildRequires:	libsoup-devel
 BuildRequires:	nice-devel >= 0.0.11
+BuildRequires:  libuuid-devel
 Requires:	telepathy-filesystem
 Obsoletes:      tapioca-xmpp
 # no longer exist since 0.5.11
@@ -32,7 +33,6 @@ chats and voice calls.
 %{_datadir}/telepathy/managers/*.manager
 %{_libdir}/telepathy-gabble
 %{_mandir}/man*/*.lzma
-%{_libdir}/telepathy/gabble-0/gateways.la
 %{_libdir}/telepathy/gabble-0/gateways.so
 
 
@@ -42,12 +42,15 @@ chats and voice calls.
 %setup -q
 
 %build
-CFLAGS="%{optflags} -fPIC" %configure2_5x --enable-olpc --disable-static
+CFLAGS="%{optflags} -fPIC" %configure2_5x --disable-static
 %make
 
 %install
 rm -rf %buildroot
 %makeinstall_std
+
+# don't ship .la
+find %buildroot -name '*.la' | xargs rm -f
 
 %clean
 rm -rf %buildroot
