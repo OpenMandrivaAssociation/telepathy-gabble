@@ -1,12 +1,14 @@
 Name:           telepathy-gabble
 Version:        0.9.16
-Release:        %mkrel 1
+Release:        %mkrel 2
 Summary:        A Jabber/XMPP connection manager
 
 Group:          Networking/Instant messaging
 License:        LGPLv2+
 URL:            http://telepathy.freedesktop.org/wiki/
 Source0:        http://telepathy.freedesktop.org/releases/%{name}/%{name}-%{version}.tar.gz
+# https://bugs.freedesktop.org/show_bug.cgi?id=29715
+Patch0:		telepathy-gabble-0.9.16-fix-certificates-path.patch
 BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}-root
 
 BuildRequires:  dbus-devel
@@ -40,6 +42,7 @@ chats and voice calls.
 
 %prep
 %setup -q
+%patch0 -p1
 
 %build
 CFLAGS="%{optflags} -fPIC" %configure2_5x --disable-static
