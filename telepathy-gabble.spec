@@ -1,5 +1,5 @@
 Name:           telepathy-gabble
-Version:        0.9.15
+Version:        0.9.16
 Release:        %mkrel 1
 Summary:        A Jabber/XMPP connection manager
 
