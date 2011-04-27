@@ -17,6 +17,7 @@ BuildRequires:  libtelepathy-glib-devel >= 0.14.5
 BuildRequires:	libsoup-devel
 BuildRequires:	nice-devel >= 0.0.11
 BuildRequires:  libuuid-devel
+BuildRequires:	gnutls-devel
 Requires:	telepathy-filesystem
 Obsoletes:      tapioca-xmpp
 # no longer exist since 0.5.11
