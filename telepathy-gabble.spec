@@ -33,7 +33,7 @@ chats and voice calls.
 %{_datadir}/dbus-1/services/*.service
 %{_datadir}/telepathy/managers/*.manager
 %{_libdir}/telepathy-gabble
-%{_mandir}/man*/*.lzma
+%{_mandir}/man*/*
 %{_libdir}/telepathy/gabble-0/gateways.so
 
 
