@@ -1,41 +1,41 @@
 Name:           telepathy-gabble
-Version:        0.12.2
-Release:        %mkrel 1
+Version:        0.16.1
+Release:        1
 Summary:        A Jabber/XMPP connection manager
-
 Group:          Networking/Instant messaging
 License:        LGPLv2+
 URL:            http://telepathy.freedesktop.org/wiki/
 Source0:        http://telepathy.freedesktop.org/releases/%{name}/%{name}-%{version}.tar.gz
-BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}-root
-
-BuildRequires:  dbus-devel
-BuildRequires:	dbus-glib-devel
+BuildRequires:	pkgconfig(dbus-1) >= 1.1.0
+BuildRequires:	pkgconfig(dbus-glib-1) >= 0.82
+BuildRequires:	pkgconfig(gio-2.0) >= 2.26
+BuildRequires:	pkgconfig(glib-2.0) >= 2.24
+BuildRequires:	pkgconfig(gmodule-2.0)
+BuildRequires:  pkgconfig(openssl)
+BuildRequires:	pkgconfig(gobject-2.0) >= 2.24
+BuildRequires:	pkgconfig(gthread-2.0) >= 2.24
+BuildRequires:	pkgconfig(libsoup-2.4)
+BuildRequires:	pkgconfig(libxml-2.0)
+BuildRequires:	pkgconfig(nice) >= 0.0.11
+BuildRequires:	pkgconfig(sqlite3)
+BuildRequires:	pkgconfig(telepathy-glib) >= 0.17.2
+#BuildRequires:	pkgconfig(telepathy-yell)
 BuildRequires:  libxslt-proc
 BuildRequires:  python-devel
-BuildRequires:  libtelepathy-glib-devel >= 0.14.5
-BuildRequires:	libsoup-devel
-BuildRequires:	nice-devel >= 0.0.11
-BuildRequires:  libuuid-devel
-BuildRequires:	gnutls-devel
 Requires:	telepathy-filesystem
-Obsoletes:      tapioca-xmpp
-# no longer exist since 0.5.11
-Obsoletes:      telepathy-gabble-devel
 
 %description
 A Jabber/XMPP connection manager, that handles single and multi-user
 chats and voice calls.
 
 %files
-%defattr(-,root,root,-)
 %doc NEWS README AUTHORS
+%{_bindir}/telepathy-gabble-xmpp-console
 %{_datadir}/dbus-1/services/*.service
 %{_datadir}/telepathy/managers/*.manager
 %{_libdir}/telepathy-gabble
-%{_mandir}/man*/*
-%{_libdir}/telepathy/gabble-0/gateways.so
-
+%{_libdir}/telepathy/gabble-0
+%{_mandir}/man*/*.*
 
 #--------------------------------------------------------------------
 
@@ -43,15 +43,11 @@ chats and voice calls.
 %setup -q
 
 %build
-%configure2_5x --disable-static --with-ca-certificates=/etc/ssl/certs/ca-bundle.crt
+%configure2_5x --disable-static
 %make
 
 %install
-rm -rf %buildroot
 %makeinstall_std
 
 # don't ship .la
 find %buildroot -name '*.la' | xargs rm -f
-
-%clean
-rm -rf %buildroot
