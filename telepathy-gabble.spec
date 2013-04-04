@@ -1,11 +1,12 @@
 Name:           telepathy-gabble
-Version:        0.16.4
+Version:        0.17.3
 Release:        1
 Summary:        A Jabber/XMPP connection manager
 Group:          Networking/Instant messaging
 License:        LGPLv2+
 URL:            http://telepathy.freedesktop.org/wiki/
 Source0:        http://telepathy.freedesktop.org/releases/%{name}/%{name}-%{version}.tar.gz
+Source100:	telepathy-gabble.rpmlintrc
 BuildRequires:	pkgconfig(dbus-1) >= 1.1.0
 BuildRequires:	pkgconfig(dbus-glib-1) >= 0.82
 BuildRequires:	pkgconfig(gio-2.0) >= 2.26
