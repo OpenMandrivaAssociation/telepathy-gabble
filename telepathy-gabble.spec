@@ -21,7 +21,7 @@ BuildRequires:	pkgconfig(nice) >= 0.0.11
 BuildRequires:	pkgconfig(sqlite3)
 BuildRequires:	pkgconfig(telepathy-glib) >= 0.17.2
 #BuildRequires:	pkgconfig(telepathy-yell)
-BuildRequires:  libxslt-proc
+BuildRequires:  pkgconfig(libxslt)
 BuildRequires:  python-devel
 Requires:	telepathy-filesystem
 
