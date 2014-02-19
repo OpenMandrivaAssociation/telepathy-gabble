@@ -34,7 +34,7 @@ chats and voice calls.
 %{_bindir}/telepathy-gabble-xmpp-console
 %{_datadir}/dbus-1/services/*.service
 %{_datadir}/telepathy/managers/*.manager
-%{_libdir}/telepathy-gabble
+%{_libexecdir}/telepathy-gabble
 %{_libdir}/telepathy/gabble-0
 %{_mandir}/man*/*.*
 
