@@ -45,7 +45,7 @@ chats and voice calls.
 
 %build
 %configure2_5x --disable-static
-%make
+make
 
 %install
 %makeinstall_std
