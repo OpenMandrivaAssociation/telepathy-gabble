@@ -1,6 +1,6 @@
 Name:           telepathy-gabble
-Version:        0.17.3
-Release:        9
+Version:        0.18.3
+Release:        1
 Summary:        A Jabber/XMPP connection manager
 Group:          Networking/Instant messaging
 License:        LGPLv2+
@@ -34,7 +34,7 @@ chats and voice calls.
 %{_bindir}/telepathy-gabble-xmpp-console
 %{_datadir}/dbus-1/services/*.service
 %{_datadir}/telepathy/managers/*.manager
-%{_libdir}/telepathy-gabble
+%{_libexecdir}/telepathy-gabble
 %{_libdir}/telepathy/gabble-0
 %{_mandir}/man*/*.*
 
@@ -44,7 +44,7 @@ chats and voice calls.
 %setup -q
 
 %build
-%configure2_5x --disable-static
+%configure PYTHON=%__python2
 make
 
 %install
