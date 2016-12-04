@@ -1,6 +1,6 @@
 Name:           telepathy-gabble
-Version:        0.18.3
-Release:        2
+Version:        0.18.4
+Release:        1
 Summary:        A Jabber/XMPP connection manager
 Group:          Networking/Instant messaging
 License:        LGPLv2+
@@ -12,7 +12,7 @@ BuildRequires:	pkgconfig(dbus-glib-1) >= 0.82
 BuildRequires:	pkgconfig(gio-2.0) >= 2.26
 BuildRequires:	pkgconfig(glib-2.0) >= 2.24
 BuildRequires:	pkgconfig(gmodule-2.0)
-BuildRequires:  pkgconfig(openssl)
+BuildRequires: 	pkgconfig(openssl)
 BuildRequires:	pkgconfig(gobject-2.0) >= 2.24
 BuildRequires:	pkgconfig(gthread-2.0) >= 2.24
 BuildRequires:	pkgconfig(libsoup-2.4)
@@ -22,8 +22,8 @@ BuildRequires:	pkgconfig(sqlite3)
 BuildRequires:	pkgconfig(telepathy-glib) >= 0.17.2
 #BuildRequires:	pkgconfig(telepathy-yell)
 BuildRequires:	rootcerts
-BuildRequires:  libxslt-proc
-BuildRequires:  python-devel
+BuildRequires:	libxslt-proc
+BuildRequires:	python-devel
 Requires:	telepathy-filesystem
 
 %description
@@ -45,11 +45,11 @@ chats and voice calls.
 %setup -q
 
 %build
-%configure PYTHON=%__python2
-make
+%configure PYTHON=%{__python2}
+%make
 
 %install
 %makeinstall_std
 
 # don't ship .la
-find %buildroot -name '*.la' | xargs rm -f
+find %{buildroot} -name '*.la' | xargs rm -f

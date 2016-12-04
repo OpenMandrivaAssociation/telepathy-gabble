@@ -1,4 +1,2 @@
-removed_sources:
-  telepathy-gabble-0.17.3.tar.gz: d912c77465b64b249ac51c92c1ce67988b6976ca
 sources:
-  telepathy-gabble-0.18.3.tar.gz: 1c71c5acf2c506788aa4b1604390f38979d88887
+  telepathy-gabble-0.18.4.tar.gz: 3277fc95ec6e4a9a5b07f5fe5b9de3283cb0c86d
