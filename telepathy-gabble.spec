@@ -1,6 +1,9 @@
+%define __noautoprov devel\\(.*\\)
+%define __noautoreq ^%{_libdir}/telepathy/.*\\.so$
+
 Name:           telepathy-gabble
 Version:        0.18.4
-Release:        1
+Release:        2
 Summary:        A Jabber/XMPP connection manager
 Group:          Networking/Instant messaging
 License:        LGPLv2+
@@ -20,7 +23,6 @@ BuildRequires:	pkgconfig(libxml-2.0)
 BuildRequires:	pkgconfig(nice) >= 0.0.11
 BuildRequires:	pkgconfig(sqlite3)
 BuildRequires:	pkgconfig(telepathy-glib) >= 0.17.2
-#BuildRequires:	pkgconfig(telepathy-yell)
 BuildRequires:	rootcerts
 BuildRequires:	libxslt-proc
 BuildRequires:	python-devel
@@ -45,7 +47,8 @@ chats and voice calls.
 %setup -q
 
 %build
-%configure PYTHON=%{__python2}
+export PYTHON=%{__python2}
+%configure --with-ca-certificates=%{_sysconfdir}/pki/tls/certs/ca-bundle.crt
 %make
 
 %install
