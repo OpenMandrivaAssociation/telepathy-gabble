@@ -1,9 +1,9 @@
 %define __noautoprov devel\\(.*\\)
-%define __noautoreq ^%{_libdir}/telepathy/.*\\.so$
+%define __noautoreq ^%{_libdir}/telepathy/.*\\.so$\\|^devel\\(.*\\)
 
 Name:           telepathy-gabble
 Version:        0.18.4
-Release:        2
+Release:        3
 Summary:        A Jabber/XMPP connection manager
 Group:          Networking/Instant messaging
 License:        LGPLv2+
