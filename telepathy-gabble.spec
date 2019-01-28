@@ -38,6 +38,7 @@ chats and voice calls.
 
 %files
 %doc NEWS README AUTHORS
+%doc %{_docdir}/%{name}
 %{_bindir}/telepathy-gabble-xmpp-console
 %{_datadir}/dbus-1/services/*.service
 %{_datadir}/telepathy/managers/*.manager
