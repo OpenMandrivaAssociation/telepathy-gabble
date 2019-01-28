@@ -1,15 +1,19 @@
-%define __noautoprov devel\\(.*\\)
-%define __noautoreq ^%{_libdir}/telepathy/.*\\.so$\\|^devel\\(.*\\)
+# .so is just for plugin thing, not a devel .so
+%global __provides_exclude devel\\(.*\\)|lib.*\\.so\\(
+%global __requires_exclude devel\\(.*\\)|lib.*\\.so\\(
 
 Name:           telepathy-gabble
 Version:        0.18.4
-Release:        4
+Release:        5
 Summary:        A Jabber/XMPP connection manager
 Group:          Networking/Instant messaging
 License:        LGPLv2+
 URL:            http://telepathy.freedesktop.org/wiki/
 Source0:        http://telepathy.freedesktop.org/releases/%{name}/%{name}-%{version}.tar.gz
 Source100:	telepathy-gabble.rpmlintrc
+# https://bugs.freedesktop.org/show_bug.cgi?id=78093
+Patch0:   telepathy-gabble-carbons-support.patch
+Patch1:   telepathy-gabble-0.18.4-openssl11.patch
 BuildRequires:	pkgconfig(dbus-1) >= 1.1.0
 BuildRequires:	pkgconfig(dbus-glib-1) >= 0.82
 BuildRequires:	pkgconfig(gio-2.0) >= 2.26
@@ -44,15 +48,15 @@ chats and voice calls.
 #--------------------------------------------------------------------
 
 %prep
-%setup -q
+%autosetup -p1
 
 %build
 export PYTHON=%{__python2}
 %configure --with-ca-certificates=%{_sysconfdir}/pki/tls/certs/ca-bundle.crt
-%make
+%make_build
 
 %install
-%makeinstall_std
+%make_install
 
 # don't ship .la
 find %{buildroot} -name '*.la' | xargs rm -f
