@@ -29,7 +29,7 @@ BuildRequires:	pkgconfig(sqlite3)
 BuildRequires:	pkgconfig(telepathy-glib) >= 0.17.2
 BuildRequires:	rootcerts
 BuildRequires:	libxslt-proc
-BuildRequires:	python-devel
+BuildRequires:	pkgconfig(python2)
 Requires:	telepathy-filesystem
 
 %description
