@@ -1,0 +1,167 @@
+diff -up telepathy-gabble-0.18.4/lib/ext/wocky/wocky/wocky-openssl.c.openssl11 telepathy-gabble-0.18.4/lib/ext/wocky/wocky/wocky-openssl.c
+--- telepathy-gabble-0.18.4/lib/ext/wocky/wocky/wocky-openssl.c.openssl11	2016-07-02 10:35:49.000000000 +0200
++++ telepathy-gabble-0.18.4/lib/ext/wocky/wocky/wocky-openssl.c	2017-09-22 01:36:08.684386491 +0200
+@@ -885,7 +885,7 @@ check_peer_name (const char *target, X50
+   int i;
+   gboolean rval = FALSE;
+   X509_NAME *subject = X509_get_subject_name (cert);
+-  X509_CINF *ci = cert->cert_info;
++//  X509_CINF *ci = cert->cert_info;
+   static const long nid[] = { NID_commonName, NID_subject_alt_name, NID_undef };
+ 
+   /* first, see if the x509 name contains the info we want: */
+@@ -906,16 +906,16 @@ check_peer_name (const char *target, X50
+    * and extract the subject_alt_name from the x509 v3 extensions: if that   *
+    * extension is present, and a string, use that. If it is present, and     *
+    * a multi-value stack, trawl it for the "DNS" entry and use that          */
+-  if (!rval && (ci->extensions != NULL))
+-    for (i = 0; i < sk_X509_EXTENSION_num(ci->extensions) && !rval; i++)
++  if (!rval && (X509_get0_extensions(cert) != NULL))
++    for (i = 0; i < sk_X509_EXTENSION_num(X509_get0_extensions(cert)) && !rval; i++)
+       {
+-        X509_EXTENSION *ext = sk_X509_EXTENSION_value (ci->extensions, i);
++        X509_EXTENSION *ext = sk_X509_EXTENSION_value (X509_get0_extensions(cert), i);
+         ASN1_OBJECT *obj = X509_EXTENSION_get_object (ext);
+         X509V3_EXT_METHOD *convert = NULL;
+         long ni = OBJ_obj2nid (obj);
+         const guchar *p;
+         char *value = NULL;
+-        int len = ext->value->length;
++        int len = X509_EXTENSION_get_data(ext)->length;
+         void *ext_str = NULL;
+ 
+         if (ni != NID_subject_alt_name)
+@@ -927,7 +927,7 @@ check_peer_name (const char *target, X50
+         if ((convert = (X509V3_EXT_METHOD *) X509V3_EXT_get (ext)) == NULL)
+           continue;
+ 
+-        p = ext->value->data;
++        p = X509_EXTENSION_get_data(ext)->data;
+         ext_str = ((convert->it != NULL) ?
+                    ASN1_item_d2i (NULL, &p, len, ASN1_ITEM_ptr(convert->it)) :
+                    convert->d2i (NULL, &p, len) );
+@@ -1119,13 +1119,14 @@ _cert_status (WockyTLSSession *session,
+           X509_STORE *store = SSL_CTX_get_cert_store(session->ctx);
+           X509 *cert = SSL_get_peer_certificate (session->ssl);
+           STACK_OF(X509) *chain = SSL_get_peer_cert_chain (session->ssl);
+-          long old_flags = store->param->flags;
++          long old_flags = X509_VERIFY_PARAM_get_flags(X509_STORE_get0_param(store));
+           long new_flags = old_flags;
+           DEBUG("No CRL available, but not in strict mode - re-verifying");
+ 
+           new_flags &= ~(X509_V_FLAG_CRL_CHECK|X509_V_FLAG_CRL_CHECK_ALL);
+ 
+-          store->param->flags = new_flags;
++          X509_VERIFY_PARAM_clear_flags(X509_STORE_get0_param(store), ~0);
++	  X509_VERIFY_PARAM_set_flags(X509_STORE_get0_param(store), new_flags);
+           X509_STORE_CTX_init (xctx, store, cert, chain);
+           X509_STORE_CTX_set_flags (xctx, new_flags);
+ 
+@@ -1135,7 +1136,8 @@ _cert_status (WockyTLSSession *session,
+               status = _cert_status (session, new_code, level, ssl_code);
+             }
+ 
+-          store->param->flags = old_flags;
++          X509_VERIFY_PARAM_clear_flags(X509_STORE_get0_param(store), ~0);
++          X509_VERIFY_PARAM_set_flags(X509_STORE_get0_param(store), old_flags);
+           X509_STORE_CTX_free (xctx);
+           X509_free (cert);
+ 
+@@ -1674,13 +1676,8 @@ wocky_tls_session_init (WockyTLSSession
+ 
+   if G_UNLIKELY (g_once_init_enter (&initialised))
+     {
+-      gint malloc_init_succeeded;
+-
+       DEBUG ("initialising SSL library and error strings");
+ 
+-      malloc_init_succeeded = CRYPTO_malloc_init ();
+-      g_warn_if_fail (malloc_init_succeeded);
+-
+       SSL_library_init ();
+       SSL_load_error_strings ();
+       OpenSSL_add_all_algorithms();
+diff -up telepathy-gabble-0.18.4/lib/ext/wocky/wocky/wocky-openssl-dh1024.c.openssl11 telepathy-gabble-0.18.4/lib/ext/wocky/wocky/wocky-openssl-dh1024.c
+--- telepathy-gabble-0.18.4/lib/ext/wocky/wocky/wocky-openssl-dh1024.c.openssl11	2016-07-02 10:35:49.000000000 +0200
++++ telepathy-gabble-0.18.4/lib/ext/wocky/wocky/wocky-openssl-dh1024.c	2017-09-22 01:39:17.479994676 +0200
+@@ -25,11 +25,14 @@ DH *get_dh1024(void)
+ 		0x02,
+ 		};
+ 	DH *dh;
++	BIGNUM * dh_p;
++	BIGNUM * dh_g;
+ 
+ 	if ((dh=DH_new()) == NULL) return(NULL);
+-	dh->p=BN_bin2bn(dh1024_p,sizeof(dh1024_p),NULL);
+-	dh->g=BN_bin2bn(dh1024_g,sizeof(dh1024_g),NULL);
+-	if ((dh->p == NULL) || (dh->g == NULL))
++	dh_p=BN_bin2bn(dh1024_p,sizeof(dh1024_p),NULL);
++	dh_g=BN_bin2bn(dh1024_g,sizeof(dh1024_g),NULL);
++	if ((dh_p == NULL) || (dh_g == NULL))
+ 		{ DH_free(dh); return(NULL); }
++	DH_set0_pqg(dh, dh_p, NULL, dh_g);
+ 	return(dh);
+ 	}
+diff -up telepathy-gabble-0.18.4/lib/ext/wocky/wocky/wocky-openssl-dh2048.c.openssl11 telepathy-gabble-0.18.4/lib/ext/wocky/wocky/wocky-openssl-dh2048.c
+--- telepathy-gabble-0.18.4/lib/ext/wocky/wocky/wocky-openssl-dh2048.c.openssl11	2016-07-02 10:35:49.000000000 +0200
++++ telepathy-gabble-0.18.4/lib/ext/wocky/wocky/wocky-openssl-dh2048.c	2017-09-22 01:40:02.993659314 +0200
+@@ -36,11 +36,14 @@ DH *get_dh2048(void)
+ 		0x02,
+ 		};
+ 	DH *dh;
++	BIGNUM * dh_p;
++	BIGNUM * dh_g;
+ 
+ 	if ((dh=DH_new()) == NULL) return(NULL);
+-	dh->p=BN_bin2bn(dh2048_p,sizeof(dh2048_p),NULL);
+-	dh->g=BN_bin2bn(dh2048_g,sizeof(dh2048_g),NULL);
+-	if ((dh->p == NULL) || (dh->g == NULL))
++	dh_p=BN_bin2bn(dh2048_p,sizeof(dh2048_p),NULL);
++	dh_g=BN_bin2bn(dh2048_g,sizeof(dh2048_g),NULL);
++	if ((dh_p == NULL) || (dh_g == NULL))
+ 		{ DH_free(dh); return(NULL); }
++	DH_set0_pqg(dh, dh_p, NULL, dh_g);
+ 	return(dh);
+ 	}
+diff -up telepathy-gabble-0.18.4/lib/ext/wocky/wocky/wocky-openssl-dh4096.c.openssl11 telepathy-gabble-0.18.4/lib/ext/wocky/wocky/wocky-openssl-dh4096.c
+--- telepathy-gabble-0.18.4/lib/ext/wocky/wocky/wocky-openssl-dh4096.c.openssl11	2016-07-02 10:35:49.000000000 +0200
++++ telepathy-gabble-0.18.4/lib/ext/wocky/wocky/wocky-openssl-dh4096.c	2017-09-22 01:40:56.489265219 +0200
+@@ -57,11 +57,14 @@ DH *get_dh4096(void)
+ 		0x02,
+ 		};
+ 	DH *dh;
++	BIGNUM * dh_p;
++	BIGNUM * dh_g;
+ 
+ 	if ((dh=DH_new()) == NULL) return(NULL);
+-	dh->p=BN_bin2bn(dh4096_p,sizeof(dh4096_p),NULL);
+-	dh->g=BN_bin2bn(dh4096_g,sizeof(dh4096_g),NULL);
+-	if ((dh->p == NULL) || (dh->g == NULL))
++	dh_p=BN_bin2bn(dh4096_p,sizeof(dh4096_p),NULL);
++	dh_g=BN_bin2bn(dh4096_g,sizeof(dh4096_g),NULL);
++	if ((dh_p == NULL) || (dh_g == NULL))
+ 		{ DH_free(dh); return(NULL); }
++	DH_set0_pqg(dh, dh_p, NULL, dh_g);
+ 	return(dh);
+ 	}
+diff -up telepathy-gabble-0.18.4/lib/ext/wocky/wocky/wocky-openssl-dh512.c.openssl11 telepathy-gabble-0.18.4/lib/ext/wocky/wocky/wocky-openssl-dh512.c
+--- telepathy-gabble-0.18.4/lib/ext/wocky/wocky/wocky-openssl-dh512.c.openssl11	2016-07-02 10:35:49.000000000 +0200
++++ telepathy-gabble-0.18.4/lib/ext/wocky/wocky/wocky-openssl-dh512.c	2017-09-22 01:38:18.295430866 +0200
+@@ -20,11 +20,14 @@ DH *get_dh512(void)
+ 		0x02,
+ 		};
+ 	DH *dh;
++	BIGNUM * dh_p;
++	BIGNUM * dh_g;
+ 
+ 	if ((dh=DH_new()) == NULL) return(NULL);
+-	dh->p=BN_bin2bn(dh512_p,sizeof(dh512_p),NULL);
+-	dh->g=BN_bin2bn(dh512_g,sizeof(dh512_g),NULL);
+-	if ((dh->p == NULL) || (dh->g == NULL))
++	dh_p=BN_bin2bn(dh512_p,sizeof(dh512_p),NULL);
++	dh_g=BN_bin2bn(dh512_g,sizeof(dh512_g),NULL);
++	if ((dh_p == NULL) || (dh_g == NULL))
+ 		{ DH_free(dh); return(NULL); }
++	DH_set0_pqg(dh, dh_p, NULL, dh_g);
+ 	return(dh);
+ 	}

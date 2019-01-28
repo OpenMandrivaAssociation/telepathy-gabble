@@ -1,0 +1,742 @@
+diff -uNr telepathy-gabble-0.18.3/src/connection.c telepathy-gabble-0.18.3p/src/connection.c
+--- telepathy-gabble-0.18.3/src/connection.c	2014-05-07 17:28:02.000000000 +0300
++++ telepathy-gabble-0.18.3p/src/connection.c	2016-08-09 15:35:20.665533495 +0300
+@@ -177,6 +177,7 @@
+     PROP_EXTRA_CERTIFICATE_IDENTITIES,
+     PROP_POWER_SAVING,
+     PROP_DOWNLOAD_AT_CONNECTION,
++    PROP_MESSAGE_CARBONS,
+ 
+     LAST_PROPERTY
+ };
+@@ -229,6 +230,8 @@
+ 
+   gboolean power_saving;
+ 
++  gboolean message_carbons;
++
+   /* authentication properties */
+   gchar *stream_server;
+   gchar *username;
+@@ -686,6 +689,10 @@
+         break;
+       }
+ 
++    case PROP_MESSAGE_CARBONS:
++      g_value_set_boolean (value, priv->message_carbons);
++      break;
++
+     default:
+       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
+       break;
+@@ -833,6 +840,10 @@
+             g_value_get_boolean (value), NULL);
+       break;
+ 
++    case PROP_MESSAGE_CARBONS:
++      priv->message_carbons = g_value_get_boolean (value);
++      break;
++
+     default:
+       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
+       break;
+@@ -1240,6 +1251,14 @@
+           FALSE,
+           G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+ 
++  g_object_class_install_property (
++      object_class, PROP_MESSAGE_CARBONS,
++      g_param_spec_boolean (
++          "message-carbons", "Message carbons enabled?",
++          "Client will receive other active resources messages",
++          FALSE,
++          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
++
+   gabble_connection_class->properties_class.interfaces = prop_interfaces;
+   tp_dbus_properties_mixin_class_init (object_class,
+       G_STRUCT_OFFSET (GabbleConnectionClass, properties_class));
+@@ -2923,6 +2942,25 @@
+   g_free (normal_id);
+ }
+ 
++static void
++carbons_cb (GObject *source_object,
++    GAsyncResult *res,
++    gpointer user_data)
++{
++  GError *error = NULL;
++  WockyPorter *porter = WOCKY_PORTER (source_object);
++  WockyStanza *reply = wocky_porter_send_iq_finish (porter, res, &error);
++
++  if (reply == NULL ||
++      wocky_stanza_extract_errors (reply, NULL, &error, NULL, NULL))
++    {
++      DEBUG ("Failed to set carbons: %s", error->message);
++      g_error_free (error);
++    }
++
++  tp_clear_object (&reply);
++}
++
+ static gchar *
+ conn_wlm_jid_lookup_finish (TpHandleRepoIface *repo,
+     GAsyncResult *result,
+@@ -3019,6 +3057,8 @@
+                 conn->features |= GABBLE_CONNECTION_FEATURES_GOOGLE_SETTING;
+               else if (0 == strcmp (var, NS_WLM_JID_LOOKUP))
+                 conn->features |= GABBLE_CONNECTION_FEATURES_WLM_JID_LOOKUP;
++              else if (0 == strcmp (var, NS_CARBONS))
++                conn->features |= GABBLE_CONNECTION_FEATURES_CARBONS;
+             }
+         }
+ 
+@@ -3036,6 +3076,28 @@
+           conn_wlm_jid_lookup_finish);
+     }
+ 
++  if ((conn->features & GABBLE_CONNECTION_FEATURES_CARBONS)
++        && (conn->priv->message_carbons))
++    {
++      WockyStanza *query;
++      WockyPorter *porter;
++      gchar *full_jid;
++
++      full_jid = gabble_connection_get_full_jid (conn);
++      porter = wocky_session_get_porter (conn->session);
++      query = wocky_stanza_build (WOCKY_STANZA_TYPE_IQ,
++                                  WOCKY_STANZA_SUB_TYPE_SET, full_jid, NULL,
++                                  '(', "enable",
++                                    ':', NS_CARBONS,
++                                  ')',
++                                  NULL);
++      wocky_porter_send_iq_async (porter, query, NULL,
++                                  carbons_cb, conn);
++
++      g_object_unref (query);
++      g_free(full_jid);
++    }
++
+   conn_presence_set_initial_presence_async (conn,
+       connection_initial_presence_cb, NULL);
+ 
+diff -uNr telepathy-gabble-0.18.3/src/connection.h telepathy-gabble-0.18.3p/src/connection.h
+--- telepathy-gabble-0.18.3/src/connection.h	2014-05-07 17:28:02.000000000 +0300
++++ telepathy-gabble-0.18.3p/src/connection.h	2016-08-09 15:34:43.090075538 +0300
+@@ -137,6 +137,7 @@
+   GABBLE_CONNECTION_FEATURES_GOOGLE_QUEUE = 1 << 8,
+   GABBLE_CONNECTION_FEATURES_GOOGLE_SETTING = 1 << 9,
+   GABBLE_CONNECTION_FEATURES_WLM_JID_LOOKUP = 1 << 10,
++  GABBLE_CONNECTION_FEATURES_CARBONS = 1 << 11,
+ } GabbleConnectionFeatures;
+ 
+ typedef struct _GabbleConnectionPrivate GabbleConnectionPrivate;
+diff -uNr telepathy-gabble-0.18.3/src/im-channel.c telepathy-gabble-0.18.3p/src/im-channel.c
+--- telepathy-gabble-0.18.3/src/im-channel.c	2014-05-07 17:16:47.000000000 +0300
++++ telepathy-gabble-0.18.3p/src/im-channel.c	2016-08-09 15:34:43.090075538 +0300
+@@ -472,6 +472,42 @@
+ }
+ 
+ /*
++ * _gabble_im_channel_sent:
++ * @chan: a channel
++ * @type: the message type
++ * @to: the full JID we sent the message to
++ * @timestamp: the time at which the message was sent
++ * @id: the id='' attribute from the <message/> stanza, if any
++ * @text: the plaintext body of the message
++ *
++ * Shoves an outgoing message into @chan.
++ */
++void
++_gabble_im_channel_sent (GabbleIMChannel *chan,
++                         TpChannelTextMessageType type,
++                         time_t timestamp,
++                         const gchar *id,
++                         const char *text)
++{
++  TpBaseChannel *base_chan;
++  TpBaseConnection *base_conn;
++  TpMessage *msg;
++
++  g_assert (GABBLE_IS_IM_CHANNEL (chan));
++  base_chan = (TpBaseChannel *) chan;
++  base_conn = tp_base_channel_get_connection (base_chan);
++
++  msg = build_message (chan, type, timestamp, text);
++  tp_cm_message_set_sender (msg, tp_base_connection_get_self_handle (base_conn));
++  tp_message_set_int64 (msg, 0, "message-received", time (NULL));
++
++  if (id != NULL)
++    tp_message_set_string (msg, 0, "message-token", id);
++
++  tp_message_mixin_take_received (G_OBJECT (chan), msg);
++}
++
++/*
+  * _gabble_im_channel_receive:
+  * @chan: a channel
+  * @message: the <message> stanza, from which all the following arguments were
+diff -uNr telepathy-gabble-0.18.3/src/im-channel.h telepathy-gabble-0.18.3p/src/im-channel.h
+--- telepathy-gabble-0.18.3/src/im-channel.h	2013-10-04 18:51:47.000000000 +0300
++++ telepathy-gabble-0.18.3p/src/im-channel.h	2016-08-09 15:34:43.091075494 +0300
+@@ -63,6 +63,11 @@
+   (G_TYPE_INSTANCE_GET_CLASS ((obj), GABBLE_TYPE_IM_CHANNEL, \
+                               GabbleIMChannelClass))
+ 
++void _gabble_im_channel_sent (GabbleIMChannel *chan,
++    TpChannelTextMessageType type,
++    time_t timestamp,
++    const char *id,
++    const char *text);
+ void _gabble_im_channel_receive (GabbleIMChannel *chan,
+     WockyStanza *message,
+     TpChannelTextMessageType type,
+diff -uNr telepathy-gabble-0.18.3/src/im-factory.c telepathy-gabble-0.18.3p/src/im-factory.c
+--- telepathy-gabble-0.18.3/src/im-factory.c	2014-05-07 17:16:47.000000000 +0300
++++ telepathy-gabble-0.18.3p/src/im-factory.c	2016-08-09 15:34:43.091075494 +0300
+@@ -205,7 +205,8 @@
+     gpointer user_data)
+ {
+   GabbleImFactory *fac = GABBLE_IM_FACTORY (user_data);
+-  const gchar *from, *body, *id;
++  const gchar *from, *to, *body, *id;
++  const gchar *chan_jid;
+   time_t stamp;
+   TpChannelTextMessageType msgtype;
+   GabbleIMChannel *chan;
+@@ -213,9 +214,10 @@
+   TpChannelTextSendError send_error;
+   TpDeliveryStatus delivery_status;
+   gboolean create_if_missing;
++  gboolean sent;
+ 
+-  if (!gabble_message_util_parse_incoming_message (message, &from, &stamp,
+-        &msgtype, &id, &body, &state, &send_error, &delivery_status))
++  if (!gabble_message_util_parse_incoming_message (message, &from, &to, &stamp,
++        &msgtype, &id, &body, &state, &send_error, &delivery_status, &sent))
+     return TRUE;
+ 
+   if (body == NULL && state == -1)
+@@ -223,13 +225,15 @@
+       return FALSE;
+     }
+ 
++  chan_jid = (sent) ? to : from;
++
+   /* We don't want to open up a channel for the sole purpose of reporting a
+    * send error, nor if this is just a chat state notification.
+    */
+   create_if_missing =
+       (send_error == GABBLE_TEXT_CHANNEL_SEND_NO_ERROR) &&
+       (body != NULL);
+-  chan = get_channel_for_incoming_message (fac, from, create_if_missing);
++  chan = get_channel_for_incoming_message (fac, chan_jid, create_if_missing);
+   if (chan == NULL)
+     {
+       if (create_if_missing)
+@@ -241,7 +245,14 @@
+       return TRUE;
+     }
+ 
+-  if (send_error != GABBLE_TEXT_CHANNEL_SEND_NO_ERROR)
++  if (sent)
++    {
++      if (body != NULL)
++        {
++          _gabble_im_channel_sent (chan, msgtype, stamp, id, body);
++        }
++    }
++  else if (send_error != GABBLE_TEXT_CHANNEL_SEND_NO_ERROR)
+     {
+       if (body == NULL)
+         {
+diff -uNr telepathy-gabble-0.18.3/src/message-util.c telepathy-gabble-0.18.3p/src/message-util.c
+--- telepathy-gabble-0.18.3/src/message-util.c	2014-05-07 17:28:02.000000000 +0300
++++ telepathy-gabble-0.18.3p/src/message-util.c	2016-08-09 15:34:43.091075494 +0300
+@@ -310,13 +310,13 @@
+ 
+ 
+ static gint
+-_tp_chat_state_from_message (WockyStanza *message)
++_tp_chat_state_from_message (WockyNode *message_node)
+ {
+   WockyNode *node;
+ 
+ #define MAP_TO(str, state) \
+   node = wocky_node_get_child_ns ( \
+-      wocky_stanza_get_top_node (message), str, \
++      message_node, str, \
+       NS_CHAT_STATES); \
+   if (node != NULL) \
+     return state;
+@@ -337,6 +337,7 @@
+  * gabble_message_util_parse_incoming_message:
+  * @message: an incoming XMPP message
+  * @from: will be set to the message sender's jid.
++ * @to: will be set to the message receiver's jid.
+  * @stamp: will be set to the message's timestamp if it's a delayed message, or
+  *         to 0 otherwise.
+  * @msgtype: will be set to the message's type.
+@@ -349,6 +350,7 @@
+  * @delivery_status: set to TemporarilyFailed if an <error type="wait"/> is
+  *                   encountered, to PermanentlyFailed if any other <error/> is
+  *                   encountered, and to Unknown otherwise.
++ * @sent: whether the message has been sent by us.
+  *
+  * Parses an incoming <message> stanza, producing various bits of the message
+  * as various out parameters.
+@@ -359,19 +361,22 @@
+ gboolean
+ gabble_message_util_parse_incoming_message (WockyStanza *message,
+                                             const gchar **from,
++                                            const gchar **to,
+                                             time_t *stamp,
+                                             TpChannelTextMessageType *msgtype,
+                                             const gchar **id,
+                                             const gchar **body_ret,
+                                             gint *state,
+                                             TpChannelTextSendError *send_error,
+-                                            TpDeliveryStatus *delivery_status)
++                                            TpDeliveryStatus *delivery_status,
++                                            gboolean *sent)
+ {
+   const gchar *type, *body;
+-  WockyNode *node;
++  WockyNode *message_node, *node;
+   WockyXmppErrorType error_type;
+   GError *error = NULL;
+ 
++  *sent = FALSE;
+   *send_error = GABBLE_TEXT_CHANNEL_SEND_NO_ERROR;
+   *delivery_status = TP_DELIVERY_STATUS_UNKNOWN;
+ 
+@@ -382,19 +387,34 @@
+       g_clear_error (&error);
+     }
+ 
+-  *id = wocky_node_get_attribute (wocky_stanza_get_top_node (message),
+-      "id");
++  message_node = wocky_stanza_get_top_node (message);
++
++  // Unwrap carbon message
++  if (((node = wocky_node_get_child_ns (message_node, "received", NS_CARBONS))
++      || (node = wocky_node_get_child_ns (message_node, "sent", NS_CARBONS)))
++      && (node = wocky_node_get_child_ns (node, "forwarded", NS_FORWARD))
++      && (node = wocky_node_get_child (node, "message")))
++    {
++      if (wocky_node_get_child_ns (message_node, "sent", NS_CARBONS))
++        {
++          *sent = TRUE;
++        }
++
++      DEBUG ("unwrapped carbons message (sent=%u)", *sent);
++      message_node = node;
++    }
++
++  *id = wocky_node_get_attribute (message_node, "id");
+ 
+-  *from = wocky_node_get_attribute (wocky_stanza_get_top_node (message),
+-      "from");
++  *to = wocky_node_get_attribute (message_node, "to");
++  *from = wocky_node_get_attribute (message_node, "from");
+   if (*from == NULL)
+     {
+       STANZA_DEBUG (message, "got a message without a from field");
+       return FALSE;
+     }
+ 
+-  type = wocky_node_get_attribute (wocky_stanza_get_top_node (message),
+-    "type");
++  type = wocky_node_get_attribute (message_node, "type");
+ 
+   /*
+    * Parse timestamp of delayed messages. For non-delayed, it's
+@@ -402,8 +422,7 @@
+    */
+   *stamp = 0;
+ 
+-  node = wocky_node_get_child_ns (
+-      wocky_stanza_get_top_node (message), "x", NS_X_DELAY);
++  node = wocky_node_get_child_ns (message_node, "x", NS_X_DELAY);
+   if (node != NULL)
+     {
+       const gchar *stamp_str;
+@@ -436,8 +455,7 @@
+   /*
+    * Parse body if it exists.
+    */
+-  node = wocky_node_get_child (wocky_stanza_get_top_node (message),
+-      "body");
++  node = wocky_node_get_child (message_node, "body");
+ 
+   if (node)
+     {
+@@ -460,7 +478,7 @@
+   if (body != NULL)
+     {
+       if (wocky_node_get_child_ns (
+-              wocky_stanza_get_top_node (message),
++              message_node,
+               "google-rbc-announcement", "google:metadata") != NULL)
+         {
+           /* Fixes: https://bugs.freedesktop.org/show_bug.cgi?id=36647 */
+@@ -469,10 +487,10 @@
+ 
+       if (type == NULL &&
+           wocky_node_get_child_ns (
+-              wocky_stanza_get_top_node (message),
++              message_node,
+               "time", "google:timestamp") != NULL &&
+           wocky_node_get_child_ns (
+-              wocky_stanza_get_top_node (message),
++              message_node,
+               "x", "jabber:x:delay") != NULL)
+         {
+           /* Google servers send offline messages without a type. Work around
+@@ -493,7 +511,7 @@
+     }
+ 
+   /* Parse chat state if it exists. */
+-  *state = _tp_chat_state_from_message (message);
++  *state = _tp_chat_state_from_message (message_node);
+ 
+   return TRUE;
+ }
+diff -uNr telepathy-gabble-0.18.3/src/message-util.h telepathy-gabble-0.18.3p/src/message-util.h
+--- telepathy-gabble-0.18.3/src/message-util.h	2013-10-04 18:51:47.000000000 +0300
++++ telepathy-gabble-0.18.3p/src/message-util.h	2016-08-09 15:34:43.092075451 +0300
+@@ -46,9 +46,10 @@
+ #define GABBLE_TEXT_CHANNEL_SEND_NO_ERROR ((TpChannelTextSendError)-1)
+ 
+ gboolean gabble_message_util_parse_incoming_message (WockyStanza *message,
+-    const gchar **from, time_t *stamp, TpChannelTextMessageType *msgtype,
+-    const gchar **id, const gchar **body_ret, gint *state,
+-    TpChannelTextSendError *send_error, TpDeliveryStatus *delivery_status);
++    const gchar **from, const gchar **to, time_t *stamp,
++    TpChannelTextMessageType *msgtype, const gchar **id,
++    const gchar **body_ret, gint *state, TpChannelTextSendError *send_error,
++    TpDeliveryStatus *delivery_status, gboolean *sent);
+ 
+ TpChannelTextSendError
+ gabble_tp_send_error_from_wocky_xmpp_error (WockyXmppError err);
+diff -uNr telepathy-gabble-0.18.3/src/muc-factory.c telepathy-gabble-0.18.3p/src/muc-factory.c
+--- telepathy-gabble-0.18.3/src/muc-factory.c	2014-05-07 17:28:02.000000000 +0300
++++ telepathy-gabble-0.18.3p/src/muc-factory.c	2016-08-09 15:34:43.092075451 +0300
+@@ -779,15 +779,17 @@
+   GabbleMucFactory *fac = GABBLE_MUC_FACTORY (user_data);
+   GabbleMucFactoryPrivate *priv = fac->priv;
+ 
+-  const gchar *from, *body, *id;
++  const gchar *from, *to, *body, *id;
+   time_t stamp;
+   TpChannelTextMessageType msgtype;
+   gint state;
+   TpChannelTextSendError send_error;
+   TpDeliveryStatus delivery_status;
++  gboolean sent;
+ 
+-  if (!gabble_message_util_parse_incoming_message (message, &from, &stamp,
+-        &msgtype, &id, &body, &state, &send_error, &delivery_status))
++  /* FIXME: handle sent? */
++  if (!gabble_message_util_parse_incoming_message (message, &from, &to, &stamp,
++        &msgtype, &id, &body, &state, &send_error, &delivery_status, &sent))
+     return TRUE;
+ 
+   if (conn_olpc_process_activity_properties_message (priv->conn, message,
+diff -uNr telepathy-gabble-0.18.3/src/namespaces.h telepathy-gabble-0.18.3p/src/namespaces.h
+--- telepathy-gabble-0.18.3/src/namespaces.h	2014-05-07 17:16:47.000000000 +0300
++++ telepathy-gabble-0.18.3p/src/namespaces.h	2016-08-09 15:34:43.093075407 +0300
+@@ -140,4 +140,7 @@
+  * See http://msdn.microsoft.com/en-us/library/live/hh550849.aspx */
+ #define NS_WLM_JID_LOOKUP "http://messenger.live.com/xmpp/jidlookup"
+ 
++#define NS_CARBONS "urn:xmpp:carbons:2"
++#define NS_FORWARD "urn:xmpp:forward:0"
++
+ #endif /* __GABBLE_NAMESPACES__H__ */
+diff -uNr telepathy-gabble-0.18.3/src/protocol.c telepathy-gabble-0.18.3p/src/protocol.c
+--- telepathy-gabble-0.18.3/src/protocol.c	2014-05-07 17:28:02.000000000 +0300
++++ telepathy-gabble-0.18.3p/src/protocol.c	2016-08-09 15:35:20.665533495 +0300
+@@ -180,6 +180,10 @@
+   { "extra-certificate-identities", "as", 0,
+     0, NULL, 0 /* unused */, NULL, NULL },
+ 
++  { "message-carbons", DBUS_TYPE_BOOLEAN_AS_STRING, G_TYPE_BOOLEAN,
++    TP_CONN_MGR_PARAM_FLAG_HAS_DEFAULT, GINT_TO_POINTER(FALSE),
++    0 /* unused */, NULL, NULL },
++
+   { NULL, NULL, 0, 0, NULL, 0 }
+ };
+ 
+@@ -260,6 +264,7 @@
+        "decloak-automatically"),
+   SAME ("fallback-servers"),
+   SAME ("extra-certificate-identities"),
++  SAME ("message-carbons"),
+   SAME (NULL)
+ };
+ #undef SAME
+diff -uNr telepathy-gabble-0.18.3/tests/test-parse-message.c telepathy-gabble-0.18.3p/tests/test-parse-message.c
+--- telepathy-gabble-0.18.3/tests/test-parse-message.c	2014-05-07 17:16:47.000000000 +0300
++++ telepathy-gabble-0.18.3p/tests/test-parse-message.c	2016-08-09 15:34:43.093075407 +0300
+@@ -15,6 +15,7 @@
+   WockyStanza *msg;
+   gboolean ret;
+   const gchar *from;
++  const gchar *to;
+   time_t stamp;
+   TpChannelTextMessageType type;
+   TpChannelTextSendError send_error;
+@@ -22,22 +23,25 @@
+   const gchar *id;
+   const gchar *body;
+   gint state;
++  gboolean sent;
+ 
+   msg = wocky_stanza_build (WOCKY_STANZA_TYPE_MESSAGE, WOCKY_STANZA_SUB_TYPE_NONE,
+         "foo@bar.com", NULL,
+         '@', "id", "a867c060-bd3f-4ecc-a38f-3e306af48e4c",
+         NULL);
+   ret = gabble_message_util_parse_incoming_message (
+-      msg, &from, &stamp, &type, &id, &body, &state, &send_error,
+-      &delivery_status);
++      msg, &from, &to, &stamp, &type, &id, &body, &state, &send_error,
++      &delivery_status, &sent);
+   g_assert (ret);
+   g_assert_cmpstr (id, ==, "a867c060-bd3f-4ecc-a38f-3e306af48e4c");
+   g_assert_cmpstr (from, ==, "foo@bar.com");
++  g_assert_null (to);
+   g_assert_cmpuint (stamp, ==, 0);
+   g_assert_cmpuint (type, ==, TP_CHANNEL_TEXT_MESSAGE_TYPE_NOTICE);
+   g_assert_cmpstr (body, ==, NULL);
+   g_assert_cmpuint (state, ==, -1);
+   g_assert_cmpuint (send_error, ==, GABBLE_TEXT_CHANNEL_SEND_NO_ERROR);
++  g_assert_false (sent);
+   g_object_unref (msg);
+ }
+ 
+@@ -50,6 +54,7 @@
+   WockyStanza *msg;
+   gboolean ret;
+   const gchar *from;
++  const gchar *to;
+   time_t stamp;
+   TpChannelTextMessageType type;
+   TpChannelTextSendError send_error;
+@@ -57,6 +62,7 @@
+   const gchar *id;
+   const gchar *body;
+   gint state;
++  gboolean sent;
+ 
+   msg = wocky_stanza_build (WOCKY_STANZA_TYPE_MESSAGE, WOCKY_STANZA_SUB_TYPE_NONE,
+         "foo@bar.com", NULL,
+@@ -64,16 +70,18 @@
+         '(', "body", '$', "hello", ')',
+         NULL);
+   ret = gabble_message_util_parse_incoming_message (
+-      msg, &from, &stamp, &type, &id, &body, &state, &send_error,
+-      &delivery_status);
++      msg, &from, &to, &stamp, &type, &id, &body, &state, &send_error,
++      &delivery_status, &sent);
+   g_assert (ret);
+   g_assert_cmpstr (id, ==, "a867c060-bd3f-4ecc-a38f-3e306af48e4c");
+   g_assert_cmpstr (from, ==, "foo@bar.com");
++  g_assert_null (to);
+   g_assert_cmpuint (stamp, ==, 0);
+   g_assert_cmpuint (type, ==, TP_CHANNEL_TEXT_MESSAGE_TYPE_NOTICE);
+   g_assert_cmpstr (body, ==, "hello");
+   g_assert_cmpuint (state, ==, -1);
+   g_assert_cmpuint (send_error, ==, GABBLE_TEXT_CHANNEL_SEND_NO_ERROR);
++  g_assert_false (sent);
+   g_object_unref (msg);
+ }
+ 
+@@ -84,6 +92,7 @@
+   WockyStanza *msg;
+   gboolean ret;
+   const gchar *from;
++  const gchar *to;
+   time_t stamp;
+   TpChannelTextMessageType type;
+   TpChannelTextSendError send_error;
+@@ -91,6 +100,7 @@
+   const gchar *id;
+   const gchar *body;
+   gint state;
++  gboolean sent;
+ 
+   msg = wocky_stanza_build (WOCKY_STANZA_TYPE_MESSAGE, WOCKY_STANZA_SUB_TYPE_CHAT,
+         "foo@bar.com", NULL,
+@@ -98,16 +108,18 @@
+         '(', "body", '$', "hello", ')',
+         NULL);
+   ret = gabble_message_util_parse_incoming_message (
+-      msg, &from, &stamp, &type, &id, &body, &state, &send_error,
+-      &delivery_status);
++      msg, &from, &to, &stamp, &type, &id, &body, &state, &send_error,
++      &delivery_status, &sent);
+   g_assert (ret);
+   g_assert_cmpstr (id, ==, "a867c060-bd3f-4ecc-a38f-3e306af48e4c");
+   g_assert_cmpstr (from, ==, "foo@bar.com");
++  g_assert_null (to);
+   g_assert_cmpuint (stamp, ==, 0);
+   g_assert_cmpuint (type, ==, TP_CHANNEL_TEXT_MESSAGE_TYPE_NORMAL);
+   g_assert_cmpstr (body, ==, "hello");
+   g_assert_cmpuint (state, ==, -1);
+   g_assert_cmpuint (send_error, ==, GABBLE_TEXT_CHANNEL_SEND_NO_ERROR);
++  g_assert_false (sent);
+   g_object_unref (msg);
+ }
+ 
+@@ -118,6 +130,7 @@
+   WockyStanza *msg;
+   gboolean ret;
+   const gchar *from;
++  const gchar *to;
+   time_t stamp;
+   TpChannelTextMessageType type;
+   TpChannelTextSendError send_error;
+@@ -125,6 +138,7 @@
+   const gchar *id;
+   const gchar *body;
+   gint state;
++  gboolean sent;
+ 
+   msg = wocky_stanza_build (
+       WOCKY_STANZA_TYPE_MESSAGE, WOCKY_STANZA_SUB_TYPE_ERROR,
+@@ -133,17 +147,19 @@
+       '(', "error", '$', "oops", ')',
+       NULL);
+   ret = gabble_message_util_parse_incoming_message (
+-      msg, &from, &stamp, &type, &id, &body, &state, &send_error,
+-      &delivery_status);
++      msg, &from, &to, &stamp, &type, &id, &body, &state, &send_error,
++      &delivery_status, &sent);
+   g_assert (ret);
+   g_assert_cmpstr (id, ==, "a867c060-bd3f-4ecc-a38f-3e306af48e4c");
+   g_assert_cmpstr (from, ==, "foo@bar.com");
++  g_assert_null (to);
+   g_assert_cmpuint (stamp, ==, 0);
+   g_assert_cmpuint (type, ==, TP_CHANNEL_TEXT_MESSAGE_TYPE_NOTICE);
+   g_assert_cmpstr (body, ==, NULL);
+   g_assert_cmpuint (state, ==, -1);
+   g_assert_cmpuint (send_error, ==, TP_CHANNEL_TEXT_SEND_ERROR_UNKNOWN);
+   g_assert_cmpuint (delivery_status, ==, TP_DELIVERY_STATUS_PERMANENTLY_FAILED);
++  g_assert_false (sent);
+   g_object_unref (msg);
+ }
+ 
+@@ -155,6 +171,7 @@
+   WockyStanza *msg;
+   gboolean ret;
+   const gchar *from;
++  const gchar *to;
+   time_t stamp;
+   TpChannelTextMessageType type;
+   TpChannelTextSendError send_error;
+@@ -162,6 +179,7 @@
+   const gchar *id;
+   const gchar *body;
+   gint state;
++  gboolean sent;
+   const gchar *message = "Wherefore art thou, Romeo?";
+ 
+   msg = wocky_stanza_build (
+@@ -178,17 +196,19 @@
+       ')',
+       NULL);
+   ret = gabble_message_util_parse_incoming_message (
+-      msg, &from, &stamp, &type, &id, &body, &state, &send_error,
+-      &delivery_status);
++      msg, &from, &to, &stamp, &type, &id, &body, &state, &send_error,
++      &delivery_status, &sent);
+   g_assert (ret);
+   g_assert_cmpstr (id, ==, "a867c060-bd3f-4ecc-a38f-3e306af48e4c");
+   g_assert_cmpstr (from, ==, "romeo@montague.net/garden");
++  g_assert_cmpstr (to, ==, "juliet@capulet.com/balcony");
+   g_assert_cmpuint (stamp, ==, 0);
+   g_assert_cmpuint (type, ==, TP_CHANNEL_TEXT_MESSAGE_TYPE_NOTICE);
+   g_assert_cmpstr (body, ==, message);
+   g_assert_cmpuint (state, ==, -1);
+   g_assert_cmpuint (send_error, ==, TP_CHANNEL_TEXT_SEND_ERROR_INVALID_CONTACT);
+   g_assert_cmpuint (delivery_status, ==, TP_DELIVERY_STATUS_PERMANENTLY_FAILED);
++  g_assert_false (sent);
+   g_object_unref (msg);
+ }
+ 
+@@ -201,6 +221,7 @@
+   WockyStanza *msg;
+   gboolean ret;
+   const gchar *from;
++  const gchar *to;
+   time_t stamp;
+   TpChannelTextMessageType type;
+   TpChannelTextSendError send_error;
+@@ -208,6 +229,7 @@
+   const gchar *id;
+   const gchar *body;
+   gint state;
++  gboolean sent;
+   const gchar *message = "Its trilling seems to have a tranquilizing effect on "
+                          "the human nervous system.";
+ 
+@@ -226,17 +248,19 @@
+       ')',
+       NULL);
+   ret = gabble_message_util_parse_incoming_message (
+-      msg, &from, &stamp, &type, &id, &body, &state, &send_error,
+-      &delivery_status);
++      msg, &from, &to, &stamp, &type, &id, &body, &state, &send_error,
++      &delivery_status, &sent);
+   g_assert (ret);
+   g_assert_cmpstr (id, ==, "a867c060-bd3f-4ecc-a38f-3e306af48e4c");
+   g_assert_cmpstr (from, ==, "other@starfleet.us/Enterprise");
++  g_assert_cmpstr (to, ==, "spock@starfleet.us/Enterprise");
+   g_assert_cmpuint (stamp, ==, 0);
+   g_assert_cmpuint (type, ==, TP_CHANNEL_TEXT_MESSAGE_TYPE_NOTICE);
+   g_assert_cmpstr (body, ==, message);
+   g_assert_cmpuint (state, ==, -1);
+   g_assert_cmpuint (send_error, ==, TP_CHANNEL_TEXT_SEND_ERROR_OFFLINE);
+   g_assert_cmpuint (delivery_status, ==, TP_DELIVERY_STATUS_TEMPORARILY_FAILED);
++  g_assert_false (sent);
+   g_object_unref (msg);
+ }
+ 
+@@ -246,6 +270,7 @@
+   WockyStanza *msg;
+   gboolean ret;
+   const gchar *from;
++  const gchar *to;
+   time_t stamp;
+   TpChannelTextMessageType type;
+   TpChannelTextSendError send_error;
+@@ -253,6 +278,7 @@
+   const gchar *id;
+   const gchar *body;
+   gint state;
++  gboolean sent;
+ 
+   msg = wocky_stanza_build (WOCKY_STANZA_TYPE_MESSAGE, WOCKY_STANZA_SUB_TYPE_NONE,
+       "foo@bar.com", NULL,
+@@ -268,16 +294,18 @@
+       ')',
+       NULL);
+   ret = gabble_message_util_parse_incoming_message (
+-      msg, &from, &stamp, &type, &id, &body, &state, &send_error,
+-      &delivery_status);
++      msg, &from, &to, &stamp, &type, &id, &body, &state, &send_error,
++      &delivery_status, &sent);
+   g_assert (ret);
+   g_assert_cmpstr (id, ==, "a867c060-bd3f-4ecc-a38f-3e306af48e4c");
+   g_assert_cmpstr (from, ==, "foo@bar.com");
++  g_assert_null (to);
+   g_assert_cmpuint (stamp, ==, 1190899454);
+   g_assert_cmpuint (type, ==, TP_CHANNEL_TEXT_MESSAGE_TYPE_NORMAL);
+   g_assert_cmpstr (body, ==, "hello");
+   g_assert_cmpuint (state, ==, -1);
+   g_assert_cmpuint (send_error, ==, GABBLE_TEXT_CHANNEL_SEND_NO_ERROR);
++  g_assert_false (sent);
+   g_object_unref (msg);
+ }
+ 
