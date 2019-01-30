@@ -4,7 +4,7 @@
 
 Name:           telepathy-gabble
 Version:        0.18.4
-Release:        5
+Release:        6
 Summary:        A Jabber/XMPP connection manager
 Group:          Networking/Instant messaging
 License:        LGPLv2+
