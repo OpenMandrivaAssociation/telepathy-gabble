@@ -14,6 +14,11 @@ Source100:	telepathy-gabble.rpmlintrc
 # https://bugs.freedesktop.org/show_bug.cgi?id=78093
 Patch0:   telepathy-gabble-carbons-support.patch
 Patch1:   telepathy-gabble-0.18.4-openssl11.patch
+BuildRequires:	autoconf
+BuildRequires:	automake
+BuildRequires:	libtool-base
+BuildRequires:	slibtool
+BuildRequires:	make
 BuildRequires:	pkgconfig(dbus-1) >= 1.1.0
 BuildRequires:	pkgconfig(dbus-glib-1) >= 0.82
 BuildRequires:	pkgconfig(gio-2.0) >= 2.26
