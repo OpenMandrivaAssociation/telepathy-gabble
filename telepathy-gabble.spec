@@ -29,7 +29,7 @@ BuildRequires:	pkgconfig(gmodule-2.0)
 BuildRequires: 	pkgconfig(openssl)
 BuildRequires:	pkgconfig(gobject-2.0) >= 2.24
 BuildRequires:	pkgconfig(gthread-2.0) >= 2.24
-BuildRequires:	pkgconfig(libsoup-2.4)
+BuildRequires:	pkgconfig(libsoup-3.0)
 BuildRequires:	pkgconfig(libxml-2.0)
 BuildRequires:	pkgconfig(nice) >= 0.0.11
 BuildRequires:	pkgconfig(sqlite3)
