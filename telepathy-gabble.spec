@@ -2,6 +2,8 @@
 %global __provides_exclude devel\\(.*\\)|lib.*\\.so\\(
 %global __requires_exclude devel\\(.*\\)|lib.*\\.so\\(
 
+%global optflags %{optflags} -Wno-incompatible-function-pointer-types
+
 Name:           telepathy-gabble
 Version:        0.18.4
 Release:        7
